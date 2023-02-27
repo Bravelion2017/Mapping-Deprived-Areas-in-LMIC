@@ -22,11 +22,13 @@ random.seed(seed)
 #=======================NAIROBI CITY=======================================
 
 # abspath_curr=os.getcwd()+os.sep+'Lagos'+os.sep
+# Get Nairobi's path then populate 144 contextual features and their labels (mask)
 abspath_curr=os.getcwd()+os.sep+'nairobi'+os.sep+'nairobi'+os.sep
 spfea144= sorted(glob(abspath_curr+'nairobi_processed_TrainData_10m'+os.sep+'spfea_144'+os.sep+'*.tif'))
 mask= sorted(glob(abspath_curr+'nairobi_processed_TrainData_10m'+os.sep+'mask'+os.sep+'*.tif'))
 print(f'Length of shapes vs labels: {len(mask),len(spfea144)}')
 
+# contextual features names
 contextual_features= ['fourier_sc31_mean',
  'fourier_sc31_variance',
  'fourier_sc51_mean',
@@ -172,6 +174,7 @@ contextual_features= ['fourier_sc31_mean',
  'sfs_sc71_std',
  'sfs_sc71_w_mean']
 
+# Combining feature & label files together
 Tiles = []
 for item in zip(spfea144, mask):
     # print(item)
@@ -186,30 +189,31 @@ for raw_image, label in Tiles:
     RasterTiles.append(raw_image)
     MaskTiles.append(label)
 
-#np.ceil(0.7*43)=31
+
 #Create train validation & test lists
 X_test_list= [f'/home/ubuntu/capstone/nairobi/nairobi/nairobi_processed_TrainData_10m/spfea_144/nai_area{i}.tif' for i in [11,13,20,23,25,28]]
-RasterTiles =np.setdiff1d(RasterTiles,X_test_list).tolist()
-X_train_list = RasterTiles[0:30]
-X_val_list = RasterTiles[30:]
+RasterTiles =np.setdiff1d(RasterTiles,X_test_list).tolist() #Removing items existing in X_test_list from RasterTiles
+X_train_list = RasterTiles[0:30] #split train
+X_val_list = RasterTiles[30:] #split validation
 
+#Replicate the above for labels
 y_test_list= [f'/home/ubuntu/capstone/nairobi/nairobi/nairobi_processed_TrainData_10m/mask/nai_area{i}.tif' for i in [11,13,20,23,25,28]]
 MaskTiles =np.setdiff1d(MaskTiles,y_test_list).tolist()
 y_train_list = MaskTiles[0:30]
 y_val_list = MaskTiles[30:]
 
 # Preparing training
-
 raster_to_mosiac = []
-
+# Read the tif files with rasterio then parse into list
 for p in X_train_list:
     raster = rasterio.open(p)
     raster_to_mosiac.append(raster)
 
-
+# Get combined numpy array from the populated list
 Xtrain, out_transform = merge(raster_to_mosiac)
 print(Xtrain.shape)
 
+# Replication for train, validation, test files on features and labels
 raster_to_mosiac = []
 
 for p in y_train_list:
@@ -239,8 +243,6 @@ for p in y_val_list:
 yval, out_transform = merge(raster_to_mosiac)
 print(yval.shape)
 
-
-
 # Preparing test data
 
 raster_to_mosiac = []
@@ -248,7 +250,6 @@ raster_to_mosiac = []
 for p in X_test_list:
     raster = rasterio.open(p)
     raster_to_mosiac.append(raster)
-
 
 Xtest, out_transform = merge(raster_to_mosiac)
 print(Xtest.shape)
@@ -262,21 +263,24 @@ for p in y_test_list:
 ytest, out_transform = merge(raster_to_mosiac)
 print(ytest.shape)
 
+
 # Dataframe Setup
 
 #Training Data
-X_train = Xtrain[:, Xtrain[0,...]!=-9999]
-y_train = ytrain[:, ytrain[0,...]!=-9999]
-y_train =y_train.astype(int)
-X_train = np.transpose(X_train)
-y_train = np.transpose(y_train)
+X_train = Xtrain[:, Xtrain[0,...]!=-9999] #cleaning the numpy array from invalid inputs (-9999)
+y_train = ytrain[:, ytrain[0,...]!=-9999] #cleaning the numpy array from invalid inputs (-9999)
+y_train =y_train.astype(int) #change the label to integer
+X_train = np.transpose(X_train) #flip the array
+y_train = np.transpose(y_train) #flip the array
 
+# Replication of the above for validation & test data
 #Validation Data
 X_val = Xval[:, Xval[0,...]!=-9999]
 y_val = yval[:, yval[0,...]!=-9999]
 y_val = y_val.astype(int)
 X_val = np.transpose(X_val)
 y_val = np.transpose(y_val)
+
 #Testing Data
 X_test = Xtest[:, Xtest[0,...]!=-9999]
 y_test = ytest[:, ytest[0,...]!=-9999]
@@ -297,6 +301,6 @@ df_test = pd.DataFrame(X_test,columns=contextual_features)  # contextual feature
 df_test['labels'] = y_test
 df_test['type'] = 'test'
 
-nairobi_df = pd.concat([df_train,df_val,df_test])
+nairobi_df = pd.concat([df_train,df_val,df_test]) #Combine train, validation & test
 # Export to parquet
 nairobi_df.to_parquet('nairobi_df.parquet.gzip',compression='gzip')
